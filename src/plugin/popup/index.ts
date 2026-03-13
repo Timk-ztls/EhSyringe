@@ -2,7 +2,7 @@ import { html, nothing, render, svg, type SVGTemplateResult, type TemplateResult
 import { sleep } from 'utils';
 import { Service } from 'typedi';
 import { Logger } from 'services/logger';
-import { type ConfigData, Storage, ImageLevel, type ArchiveDownloadType } from 'services/storage';
+import { type ConfigData, Storage, ImageLevel, type ArchiveDownloadType, type HathDownloadQuality } from 'services/storage';
 import { Messaging } from 'services/messaging';
 import { DateTime } from 'services/date-time';
 import { openInTab } from 'providers/utils';
@@ -311,8 +311,60 @@ export class Popup {
                             <option value="resample" ?selected="${state.configValue.autoArchiveDownload === 'resample'}">
                                 下载重采样档案
                             </option>
+                            <option value="hath" ?selected="${state.configValue.autoArchiveDownload === 'hath'}">
+                                H@H 下载
+                            </option>
                         </select>
                     </div>
+                    ${state.configValue.autoArchiveDownload === 'hath'
+                        ? html`<div class="hath-quality">
+                              <label for="hathDownloadQuality">H@H 画质: </label>
+                              <select
+                                  id="hathDownloadQuality"
+                                  @change="${(e: Event) => {
+                                      const value = (e.target as HTMLSelectElement).value as HathDownloadQuality;
+                                      this.changeConfigValue('hathDownloadQuality', value);
+                                  }}"
+                              >
+                                  <option
+                                      value="original"
+                                      ?selected="${state.configValue.hathDownloadQuality === 'original'}"
+                                  >
+                                      原图
+                                  </option>
+                                  <option
+                                      value="2400x"
+                                      ?selected="${state.configValue.hathDownloadQuality === '2400x'}"
+                                  >
+                                      2400x（如不可用则降级）
+                                  </option>
+                                  <option
+                                      value="1600x"
+                                      ?selected="${state.configValue.hathDownloadQuality === '1600x'}"
+                                  >
+                                      1600x（如不可用则降级）
+                                  </option>
+                                  <option
+                                      value="1280x"
+                                      ?selected="${state.configValue.hathDownloadQuality === '1280x'}"
+                                  >
+                                      1280x（如不可用则降级）
+                                  </option>
+                                  <option
+                                      value="980x"
+                                      ?selected="${state.configValue.hathDownloadQuality === '980x'}"
+                                  >
+                                      980x（如不可用则降级）
+                                  </option>
+                                  <option
+                                      value="780x"
+                                      ?selected="${state.configValue.hathDownloadQuality === '780x'}"
+                                  >
+                                      780x
+                                  </option>
+                              </select>
+                          </div>`
+                        : nothing}
                     <div class="image-level">
                         <p class="range-title">
                             介绍图片:

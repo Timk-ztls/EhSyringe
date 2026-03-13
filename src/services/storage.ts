@@ -13,7 +13,8 @@ export const enum ImageLevel {
     r18g,
 }
 
-export type ArchiveDownloadType = 'disabled' | 'original' | 'resample';
+export type ArchiveDownloadType = 'disabled' | 'original' | 'resample' | 'hath';
+export type HathDownloadQuality = 'original' | '2400x' | '1600x' | '1280x' | '980x' | '780x';
 
 export interface ConfigData {
     translateUi: boolean;
@@ -26,6 +27,7 @@ export interface ConfigData {
     tagTip: boolean;
     overrideDbUrl: string;
     autoArchiveDownload: ArchiveDownloadType;
+    hathDownloadQuality: HathDownloadQuality;
 }
 
 export interface StorageItems {
@@ -115,6 +117,7 @@ export class Storage {
             tagTip: true,
             overrideDbUrl: '',
             autoArchiveDownload: 'disabled',
+            hathDownloadQuality: 'original',
         },
         database: undefined,
         databaseInfo: undefined,
