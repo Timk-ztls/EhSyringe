@@ -240,6 +240,7 @@ export default async (env = {}, argv = {}) => {
                             'GM_addValueChangeListener',
                             'GM_removeValueChangeListener',
                             'GM_openInTab',
+                            'GM_closeTab',
                             'GM_notification',
                         ],
                     };

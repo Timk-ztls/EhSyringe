@@ -9,6 +9,7 @@ import { Logger } from 'services/logger';
 import { Messaging } from 'services/messaging';
 import { Tagging } from 'services/tagging';
 import { DateTime } from 'services/date-time';
+import { closeCurrentTab } from 'providers/utils';
 
 import './index.less';
 
@@ -327,39 +328,45 @@ export class Syringe {
     }
 
     private autoClickArchiveButton(): void {
-        if (!location.pathname.startsWith('/archiver.php')) return;
-        this.logger.log('[archiver] 检测到 archiver.php 页面，准备自动下载');
+        if (location.pathname.startsWith('/archiver.php')) {
+            this.logger.log('[archiver] 检测到 archiver.php 页面，准备自动下载');
 
-        ready(() => {
-            const type = this.config.autoArchiveDownload;
-            this.logger.log(`[archiver] 自动下载配置: ${type}`);
-            if (type === 'disabled') {
-                this.logger.log('[archiver] 自动下载已禁用，跳过');
-                return;
-            }
+            ready(() => {
+                const type = this.config.autoArchiveDownload;
+                this.logger.log(`[archiver] 自动下载配置: ${type}`);
+                if (type === 'disabled') {
+                    this.logger.log('[archiver] 自动下载已禁用，跳过');
+                    return;
+                }
 
-            // Detect H@H download success page: after the download request is queued the
-            // archiver page stays open showing a confirmation message.  Auto-close the tab
-            // so the user does not have to dismiss it manually.
-            // The syringe translates this message before this callback runs, so check
-            // for both the original English text and the Chinese translation.
-            const bodyText = document.body?.textContent ?? '';
-            if (
-                bodyText.includes('Downloads should start processing within a couple of minutes.') ||
-                bodyText.includes('下载会在几分钟内开始')
-            ) {
-                this.logger.log('[archiver] 检测到 H@H 排队成功页面，关闭标签页');
-                window.close();
-                return;
-            }
+                // Detect H@H download success page: after the download request is queued the
+                // archiver page stays open showing a confirmation message.  Auto-close the tab
+                // so the user does not have to dismiss it manually.
+                // The syringe translates this message before this callback runs, so check
+                // for both the original English text and the Chinese translation.
+                const bodyText = document.body?.textContent ?? '';
+                if (
+                    bodyText.includes('Downloads should start processing within a couple of minutes.') ||
+                    bodyText.includes('下载会在几分钟内开始')
+                ) {
+                    this.logger.log('[archiver] 检测到 H@H 排队成功页面，关闭标签页');
+                    closeCurrentTab();
+                    return;
+                }
 
-            this.logger.log(`[archiver] 开始寻找下载按钮，类型: ${type}`);
-            const clicked = this.tryArchiveButtonClick(type);
-            if (!clicked) {
-                this.logger.log('[archiver] 页面中未找到按钮，等待动态加载...');
-                this.watchForArchiveButton(type);
-            }
-        });
+                this.logger.log(`[archiver] 开始寻找下载按钮，类型: ${type}`);
+                const clicked = this.tryArchiveButtonClick(type);
+                if (!clicked) {
+                    this.logger.log('[archiver] 页面中未找到按钮，等待动态加载...');
+                    this.watchForArchiveButton(type);
+                }
+            });
+            return;
+        }
+
+        if (location.hostname.endsWith('.hath.network') && location.pathname.startsWith('/archive/')) {
+            this.autoClickHathNetworkDownload();
+        }
     }
 
     /** Try to find and click the appropriate archive download button.
@@ -420,7 +427,7 @@ export class Syringe {
             ) {
                 this.logger.log('[archiver] 动态检测到 H@H 排队成功页面，关闭标签页');
                 observer.disconnect();
-                window.close();
+                closeCurrentTab();
                 return;
             }
 
@@ -555,6 +562,73 @@ export class Syringe {
 
         this.logger.warn('[archiver/hath] 未找到任何可用的分辨率按钮');
         return false;
+    }
+
+    /** Handle the hath.network /archive/ page: auto-click the download link and close the tab. */
+    private autoClickHathNetworkDownload(): void {
+        if (this.config.autoArchiveDownload === 'disabled') return;
+        this.logger.log('[archiver] 检测到 H@H 归档下载页面，准备自动点击下载');
+
+        ready(() => {
+            const clicked = this.tryClickHathNetworkDownload();
+            if (!clicked) {
+                this.logger.log('[archiver] 未找到下载链接，等待页面更新...');
+                this.watchHathNetworkDownloadPage();
+            }
+        });
+    }
+
+    /** Try to find and click the download link on the hath.network archive page.
+     *  Returns true if the link was found and clicked, false otherwise. */
+    private tryClickHathNetworkDownload(): boolean {
+        const downloadTexts = [
+            'Click Here To Start Downloading',
+            '点击此处开始下载',
+            'Click here if your browser does not continue automatically',
+            '如果您的浏览器没有自动继续，请点击此处',
+        ];
+        const downloadLink = [...document.querySelectorAll<HTMLAnchorElement>('a[href]')].find((a) =>
+            downloadTexts.includes(a.textContent?.trim() ?? ''),
+        );
+        if (downloadLink) {
+            this.logger.log(`[archiver] 找到下载链接 "${downloadLink.textContent?.trim()}"，点击`);
+            downloadLink.click();
+            closeCurrentTab();
+            return true;
+        }
+        return false;
+    }
+
+    /** Watch the hath.network archive page for the download link to appear. */
+    private watchHathNetworkDownloadPage(): void {
+        const maxWaitMs = 600_000; // 10 minutes – file preparation can take time
+        const startTime = Date.now();
+        let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+        const check = (): void => {
+            const elapsed = Date.now() - startTime;
+            if (elapsed > maxWaitMs) {
+                this.logger.warn(`[archiver] 等待 H@H 下载链接超时 (${maxWaitMs}ms)，放弃`);
+                observer.disconnect();
+                return;
+            }
+            const clicked = this.tryClickHathNetworkDownload();
+            if (clicked) {
+                observer.disconnect();
+            }
+        };
+
+        const observer = new MutationObserver(() => {
+            if (debounceTimer !== null) {
+                clearTimeout(debounceTimer);
+            }
+            debounceTimer = setTimeout(() => {
+                debounceTimer = null;
+                check();
+            }, 50);
+        });
+
+        observer.observe(document.body, { childList: true, subtree: true });
     }
 
     private updatingTagMap?: Promise<void>;
