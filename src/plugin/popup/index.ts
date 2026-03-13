@@ -2,7 +2,7 @@ import { html, nothing, render, svg, type SVGTemplateResult, type TemplateResult
 import { sleep } from 'utils';
 import { Service } from 'typedi';
 import { Logger } from 'services/logger';
-import { type ConfigData, Storage, ImageLevel } from 'services/storage';
+import { type ConfigData, Storage, ImageLevel, type ArchiveDownloadType } from 'services/storage';
 import { Messaging } from 'services/messaging';
 import { DateTime } from 'services/date-time';
 import { openInTab } from 'providers/utils';
@@ -293,6 +293,26 @@ export class Popup {
                             </div>
                         `,
                     )}
+                    <div class="archive-download">
+                        <label for="autoArchiveDownload">归档自动下载: </label>
+                        <select
+                            id="autoArchiveDownload"
+                            @change="${(e: Event) => {
+                                const value = (e.target as HTMLSelectElement).value as ArchiveDownloadType;
+                                this.changeConfigValue('autoArchiveDownload', value);
+                            }}"
+                        >
+                            <option value="disabled" ?selected="${state.configValue.autoArchiveDownload === 'disabled'}">
+                                关闭
+                            </option>
+                            <option value="original" ?selected="${state.configValue.autoArchiveDownload === 'original'}">
+                                下载原始档案
+                            </option>
+                            <option value="resample" ?selected="${state.configValue.autoArchiveDownload === 'resample'}">
+                                下载重采样档案
+                            </option>
+                        </select>
+                    </div>
                     <div class="image-level">
                         <p class="range-title">
                             介绍图片:

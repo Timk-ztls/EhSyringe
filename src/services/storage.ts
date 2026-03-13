@@ -13,6 +13,8 @@ export const enum ImageLevel {
     r18g,
 }
 
+export type ArchiveDownloadType = 'disabled' | 'original' | 'resample';
+
 export interface ConfigData {
     translateUi: boolean;
     translateTag: boolean;
@@ -23,6 +25,7 @@ export interface ConfigData {
     autoUpdate: boolean;
     tagTip: boolean;
     overrideDbUrl: string;
+    autoArchiveDownload: ArchiveDownloadType;
 }
 
 export interface StorageItems {
@@ -111,6 +114,7 @@ export class Storage {
             autoUpdate: true,
             tagTip: true,
             overrideDbUrl: '',
+            autoArchiveDownload: 'disabled',
         },
         database: undefined,
         databaseInfo: undefined,
