@@ -49,6 +49,16 @@ export function openInTab(url: string): void {
     _openInTab(url, { active: true, insert: true, setParent: true });
 }
 
+declare function GM_closeTab(tabId?: number, opt_keepOpen?: boolean): void;
+
+export function closeCurrentTab(): void {
+    if (typeof GM_closeTab == 'function') {
+        GM_closeTab();
+    } else {
+        window.close();
+    }
+}
+
 export function sendNotification(info: NotificationInfo): void {
     _notification({ text: info.message, title: info.title, onclick: info.action });
 }

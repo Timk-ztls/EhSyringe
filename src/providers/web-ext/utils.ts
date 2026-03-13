@@ -8,6 +8,10 @@ export function openInTab(url: string): void {
     });
 }
 
+export function closeCurrentTab(): void {
+    window.close();
+}
+
 export function sendNotification(info: NotificationInfo): void {
     browser.notifications
         .create({
