@@ -27,7 +27,12 @@ jobs:
         uses: wyvox/action-setup-pnpm@v3
       - name: Download crx key
         if: github.event_name == 'push'
-        run: echo "${{ secrets.CRX_KEY }}" > key.pem
+        env:
+          CRX_KEY: ${{ secrets.CRX_KEY }}
+        run: |
+          if [ -n "$CRX_KEY" ]; then
+            echo "$CRX_KEY" > key.pem
+          fi
       - name: Build monkey
         run: pnpm run build:monkey
       - name: Build chrome

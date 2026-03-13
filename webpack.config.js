@@ -48,7 +48,7 @@ export default async (env = {}, argv = {}) => {
     version.prerelease = version.build = [];
 
     /** @type {'user-script' | 'web-ext'} */
-    const type = env.type;
+    const type = env.type ?? 'web-ext';
 
     /** @type {webpack.Configuration} */
     const config = {
