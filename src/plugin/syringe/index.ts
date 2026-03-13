@@ -333,6 +333,18 @@ export class Syringe {
             const type = this.config.autoArchiveDownload;
             if (type === 'disabled') return;
 
+            // Detect H@H download success page: after the download request is queued the
+            // archiver page stays open showing a confirmation message.  Auto-close the tab
+            // so the user does not have to dismiss it manually.
+            if (
+                document.body.textContent?.includes(
+                    'Downloads should start processing within a couple of minutes.',
+                )
+            ) {
+                window.close();
+                return;
+            }
+
             if (type === 'hath') {
                 this.autoClickHathDownloadButton();
                 return;
