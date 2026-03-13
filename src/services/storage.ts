@@ -14,7 +14,7 @@ export const enum ImageLevel {
 }
 
 export type ArchiveDownloadType = 'disabled' | 'original' | 'resample' | 'hath';
-export type HathDownloadQuality = 'original' | '2400x' | '1600x' | '1280x' | '980x' | '780x';
+export type HathDownloadQuality = 'original' | '2560x' | '1920x' | '1280x' | '800x';
 
 export interface ConfigData {
     translateUi: boolean;

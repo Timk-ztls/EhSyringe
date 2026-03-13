@@ -22,9 +22,13 @@ merge(
         Close: '取消',
 
         'H@H Downloader': 'H@H 下载器',
+        'H@H 下載器': 'H@H 下载器',
         'N/A': '不适用',
+        不適用: '不适用',
         Original: '原图',
+        原圖: '原图',
         Free: '免费',
+        免費: '免费',
 
         'You must have a H@H client assigned to your account to use this feature.':
             '您必须拥有 H@H 客户端才能使用此功能',

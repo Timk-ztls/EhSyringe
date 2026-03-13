@@ -457,18 +457,31 @@ export class Syringe {
      *  Returns true if a button was found and clicked, false otherwise. */
     private autoClickHathDownloadButton(): boolean {
         // Resolution order from highest to lowest quality
-        const resolutionOrder: HathDownloadQuality[] = ['original', '2400x', '1600x', '1280x', '980x', '780x'];
+        const resolutionOrder: HathDownloadQuality[] = ['original', '2560x', '1920x', '1280x', '800x'];
         // Map from quality setting to H@H form select values
         const resolutionValues: Record<HathDownloadQuality, string> = {
             original: 'org',
-            '2400x': '2400',
-            '1600x': '1600',
+            '2560x': '2560',
+            '1920x': '1920',
             '1280x': '1280',
-            '980x': '980',
-            '780x': '780',
+            '800x': '800',
+        };
+        // Map legacy quality settings (from older EH page) to current ones
+        const legacyQualityMap: Record<string, HathDownloadQuality> = {
+            '2400x': '2560x',
+            '1600x': '1920x',
+            '980x': '800x',
+            '780x': '800x',
         };
 
-        const targetQuality = this.config.hathDownloadQuality;
+        let targetQuality = this.config.hathDownloadQuality;
+        if (!resolutionOrder.includes(targetQuality)) {
+            const mapped = legacyQualityMap[targetQuality];
+            if (mapped) {
+                this.logger.log(`[archiver/hath] 旧版质量设置 ${targetQuality} 已映射为 ${mapped}`);
+                targetQuality = mapped;
+            }
+        }
         const startIndex = resolutionOrder.indexOf(targetQuality);
         this.logger.log(`[archiver/hath] 目标质量: ${targetQuality} (索引: ${startIndex})`);
         if (startIndex === -1) {
@@ -511,19 +524,24 @@ export class Syringe {
         // Each entry lists the accepted display texts for that resolution – both the English
         // original and its Chinese translation (applied by the syringe before this code runs).
         const resolutionTexts: Record<string, string[]> = {
-            org: ['Original', '原图'],
-            '2400': ['2400x'],
-            '1600': ['1600x'],
+            org: ['Original', '原图', '原圖'],
+            '2560': ['2560x'],
+            '1920': ['1920x'],
             '1280': ['1280x'],
-            '980': ['980x'],
-            '780': ['780x'],
+            '800': ['800x'],
         };
         // Prefer a known H@H container id; fall back to table cells matching the section heading
+        // Check for English, simplified Chinese, and traditional Chinese heading variants
         const hathHeading =
             document.querySelector('#hathdl') ??
-            [...document.querySelectorAll('td, th')].find(
-                (el) => el.textContent?.trim() === 'H@H Downloader' || el.textContent?.trim() === 'H@H 下载器',
-            );
+            [...document.querySelectorAll('td, th, p, div, span')].find((el) => {
+                const text = el.textContent?.trim();
+                return (
+                    text === 'H@H Downloader' ||
+                    text === 'H@H 下载器' ||
+                    text === 'H@H 下載器'
+                );
+            });
         this.logger.log(`[archiver/hath] H@H 容器标题: ${hathHeading ? hathHeading.tagName + '#' + hathHeading.id : '未找到'}`);
         const hathContainer = hathHeading?.closest('table, div');
         if (!hathContainer) {
