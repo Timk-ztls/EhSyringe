@@ -3,7 +3,7 @@ import { ready } from 'utils/dom';
 import type { EHTNamespaceNameShort } from 'interface';
 import { Service } from 'services';
 import { UiTranslation } from 'services/ui-translation';
-import type { ConfigData } from 'services/storage';
+import type { ConfigData, HathDownloadQuality } from 'services/storage';
 import { SyncStorage } from 'services/sync-storage';
 import { Logger } from 'services/logger';
 import { Messaging } from 'services/messaging';
@@ -333,6 +333,11 @@ export class Syringe {
             const type = this.config.autoArchiveDownload;
             if (type === 'disabled') return;
 
+            if (type === 'hath') {
+                this.autoClickHathDownloadButton();
+                return;
+            }
+
             const targetValue =
                 type === 'original' ? 'Download Original Archive' : 'Download Resample Archive';
 
@@ -343,6 +348,78 @@ export class Syringe {
                 document.querySelector<HTMLButtonElement>(`button[ehs-input][value="${targetValue}"]`);
             btn?.click();
         });
+    }
+
+    private autoClickHathDownloadButton(): void {
+        // Resolution order from highest to lowest quality
+        const resolutionOrder: HathDownloadQuality[] = ['original', '2400x', '1600x', '1280x', '980x', '780x'];
+        // Map from quality setting to H@H form select values
+        const resolutionValues: Record<HathDownloadQuality, string> = {
+            original: 'org',
+            '2400x': '2400',
+            '1600x': '1600',
+            '1280x': '1280',
+            '980x': '980',
+            '780x': '780',
+        };
+
+        const targetQuality = this.config.hathDownloadQuality;
+        const startIndex = resolutionOrder.indexOf(targetQuality);
+        if (startIndex === -1) return;
+
+        // Strategy 1: Look for a select element with H@H resolution options (hathdl_xres)
+        const select = document.querySelector<HTMLSelectElement>('select[name="hathdl_xres"]');
+        if (select) {
+            for (let i = startIndex; i < resolutionOrder.length; i++) {
+                const res = resolutionValues[resolutionOrder[i]];
+                const option = Array.from(select.options).find((o) => o.value === res && !o.disabled);
+                if (option) {
+                    select.value = res;
+                    const form = select.closest('form');
+                    const btn = form?.querySelector<HTMLElement>(
+                        'input[type="submit"], button[type="submit"], button[ehs-input]',
+                    );
+                    btn?.click();
+                    return;
+                }
+            }
+            return;
+        }
+
+        // Strategy 2: Find H@H downloader section by heading text, then locate resolution rows
+        const resolutionTexts: Record<string, string> = {
+            org: 'Original',
+            '2400': '2400x',
+            '1600': '1600x',
+            '1280': '1280x',
+            '980': '980x',
+            '780': '780x',
+        };
+        // Prefer a known H@H container id; fall back to table cells matching the section heading
+        const hathHeading =
+            document.querySelector('#hathdl') ??
+            [...document.querySelectorAll('td, th')].find(
+                (el) => el.textContent?.trim() === 'H@H Downloader' || el.textContent?.trim() === 'H@H 下载器',
+            );
+        const hathContainer = hathHeading?.closest('table, div');
+        if (!hathContainer) return;
+
+        for (let i = startIndex; i < resolutionOrder.length; i++) {
+            const res = resolutionValues[resolutionOrder[i]];
+            const resText = resolutionTexts[res];
+            const resCell = [...hathContainer.querySelectorAll('td, a')].find(
+                (el) => el.textContent?.trim() === resText,
+            );
+            if (!resCell) continue;
+            const row = resCell.closest('tr');
+            const btn = row?.querySelector<HTMLElement>(
+                'input[type="submit"], button[type="submit"], button[ehs-input], a[href]',
+            );
+            if (btn) {
+                btn.click();
+                return;
+            }
+        }
     }
 
     private updatingTagMap?: Promise<void>;
