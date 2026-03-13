@@ -3,7 +3,7 @@ import { ready } from 'utils/dom';
 import type { EHTNamespaceNameShort } from 'interface';
 import { Service } from 'services';
 import { UiTranslation } from 'services/ui-translation';
-import type { ConfigData, HathDownloadQuality } from 'services/storage';
+import type { ArchiveDownloadType, ConfigData, HathDownloadQuality } from 'services/storage';
 import { SyncStorage } from 'services/sync-storage';
 import { Logger } from 'services/logger';
 import { Messaging } from 'services/messaging';
@@ -328,44 +328,127 @@ export class Syringe {
 
     private autoClickArchiveButton(): void {
         if (!location.pathname.startsWith('/archiver.php')) return;
+        this.logger.log('[archiver] 检测到 archiver.php 页面，准备自动下载');
 
         ready(() => {
             const type = this.config.autoArchiveDownload;
-            if (type === 'disabled') return;
+            this.logger.log(`[archiver] 自动下载配置: ${type}`);
+            if (type === 'disabled') {
+                this.logger.log('[archiver] 自动下载已禁用，跳过');
+                return;
+            }
 
             // Detect H@H download success page: after the download request is queued the
             // archiver page stays open showing a confirmation message.  Auto-close the tab
             // so the user does not have to dismiss it manually.
             // The syringe translates this message before this callback runs, so check
             // for both the original English text and the Chinese translation.
+            const bodyText = document.body?.textContent ?? '';
             if (
-                document.body.textContent?.includes(
-                    'Downloads should start processing within a couple of minutes.',
-                ) ||
-                document.body.textContent?.includes('下载会在几分钟内开始')
+                bodyText.includes('Downloads should start processing within a couple of minutes.') ||
+                bodyText.includes('下载会在几分钟内开始')
             ) {
+                this.logger.log('[archiver] 检测到 H@H 排队成功页面，关闭标签页');
                 window.close();
                 return;
             }
 
-            if (type === 'hath') {
-                this.autoClickHathDownloadButton();
-                return;
+            this.logger.log(`[archiver] 开始寻找下载按钮，类型: ${type}`);
+            const clicked = this.tryArchiveButtonClick(type);
+            if (!clicked) {
+                this.logger.log('[archiver] 页面中未找到按钮，等待动态加载...');
+                this.watchForArchiveButton(type);
             }
-
-            const targetValue =
-                type === 'original' ? 'Download Original Archive' : 'Download Resample Archive';
-
-            // The syringe replaces input[type="submit"] with button[ehs-input] during translation,
-            // keeping the original value attribute. Try both selectors.
-            const btn =
-                document.querySelector<HTMLInputElement>(`input[type="submit"][value="${targetValue}"]`) ??
-                document.querySelector<HTMLButtonElement>(`button[ehs-input][value="${targetValue}"]`);
-            btn?.click();
         });
     }
 
-    private autoClickHathDownloadButton(): void {
+    /** Try to find and click the appropriate archive download button.
+     *  Returns true if a button was found and clicked, false otherwise.
+     *  When verbose is true (default), logs a diagnostic list of all submit buttons when the target is not found. */
+    private tryArchiveButtonClick(type: Exclude<ArchiveDownloadType, 'disabled'>, verbose = true): boolean {
+        if (type === 'hath') {
+            return this.autoClickHathDownloadButton();
+        }
+
+        const targetValue = type === 'original' ? 'Download Original Archive' : 'Download Resample Archive';
+
+        // The syringe replaces input[type="submit"] with button[ehs-input] during translation,
+        // keeping the original value attribute. Try both selectors.
+        const btn =
+            document.querySelector<HTMLInputElement>(`input[type="submit"][value="${targetValue}"]`) ??
+            document.querySelector<HTMLButtonElement>(`button[ehs-input][value="${targetValue}"]`);
+
+        if (btn) {
+            this.logger.log(
+                `[archiver] 找到按钮 (tagName=${btn.tagName}, value="${btn.getAttribute('value')}"), 点击`,
+            );
+            btn.click();
+            return true;
+        }
+
+        if (verbose) {
+            const allSubmitBtns = [
+                ...document.querySelectorAll('input[type="submit"], button[type="submit"], button[ehs-input]'),
+            ].map((el) => `${el.tagName}[value="${el.getAttribute('value')}"]`);
+            this.logger.log(
+                `[archiver] 未找到目标按钮 (value="${targetValue}")，页面中所有提交按钮: [${allSubmitBtns.join(', ') || '无'}]`,
+            );
+        }
+        return false;
+    }
+
+    /** Watch the DOM for the archive download buttons to appear (in case they are loaded dynamically).
+     *  Disconnects after the button is clicked or after a timeout. */
+    private watchForArchiveButton(type: Exclude<ArchiveDownloadType, 'disabled'>): void {
+        const maxWaitMs = 30_000;
+        const startTime = Date.now();
+        let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+        const check = (): void => {
+            const elapsed = Date.now() - startTime;
+            if (elapsed > maxWaitMs) {
+                this.logger.warn(`[archiver] 等待下载按钮超时 (${maxWaitMs}ms)，放弃`);
+                observer.disconnect();
+                return;
+            }
+
+            // Re-check for success page in case the page updated after initial check.
+            const bodyText = document.body?.textContent ?? '';
+            if (
+                bodyText.includes('Downloads should start processing within a couple of minutes.') ||
+                bodyText.includes('下载会在几分钟内开始')
+            ) {
+                this.logger.log('[archiver] 动态检测到 H@H 排队成功页面，关闭标签页');
+                observer.disconnect();
+                window.close();
+                return;
+            }
+
+            // Use non-verbose mode to avoid re-listing all buttons on every mutation.
+            const clicked = this.tryArchiveButtonClick(type, false);
+            if (clicked) {
+                this.logger.log(`[archiver] 动态加载后成功点击按钮 (耗时 ${elapsed}ms)`);
+                observer.disconnect();
+            }
+        };
+
+        const observer = new MutationObserver(() => {
+            // Debounce: batch rapid mutations into a single check after 50 ms.
+            if (debounceTimer !== null) {
+                clearTimeout(debounceTimer);
+            }
+            debounceTimer = setTimeout(() => {
+                debounceTimer = null;
+                check();
+            }, 50);
+        });
+
+        observer.observe(document.body, { childList: true, subtree: true });
+    }
+
+    /** Try to find and click the H@H download button matching the configured quality.
+     *  Returns true if a button was found and clicked, false otherwise. */
+    private autoClickHathDownloadButton(): boolean {
         // Resolution order from highest to lowest quality
         const resolutionOrder: HathDownloadQuality[] = ['original', '2400x', '1600x', '1280x', '980x', '780x'];
         // Map from quality setting to H@H form select values
@@ -380,25 +463,41 @@ export class Syringe {
 
         const targetQuality = this.config.hathDownloadQuality;
         const startIndex = resolutionOrder.indexOf(targetQuality);
-        if (startIndex === -1) return;
+        this.logger.log(`[archiver/hath] 目标质量: ${targetQuality} (索引: ${startIndex})`);
+        if (startIndex === -1) {
+            this.logger.warn(`[archiver/hath] 未知的目标质量: ${targetQuality}`);
+            return false;
+        }
 
         // Strategy 1: Look for a select element with H@H resolution options (hathdl_xres)
         const select = document.querySelector<HTMLSelectElement>('select[name="hathdl_xres"]');
         if (select) {
+            const allOptions = Array.from(select.options);
+            const optionSummary = allOptions.length > 10
+                ? `${allOptions.slice(0, 10).map((o) => `${o.value}(disabled=${o.disabled})`).join(', ')} ... (共 ${allOptions.length} 项)`
+                : allOptions.map((o) => `${o.value}(disabled=${o.disabled})`).join(', ');
+            this.logger.log(`[archiver/hath] 找到 select[name="hathdl_xres"]，选项: [${optionSummary}]`);
             for (let i = startIndex; i < resolutionOrder.length; i++) {
                 const res = resolutionValues[resolutionOrder[i]];
                 const option = Array.from(select.options).find((o) => o.value === res && !o.disabled);
                 if (option) {
+                    this.logger.log(`[archiver/hath] 选择分辨率 ${res}`);
                     select.value = res;
                     const form = select.closest('form');
                     const btn = form?.querySelector<HTMLElement>(
                         'input[type="submit"], button[type="submit"], button[ehs-input]',
                     );
-                    btn?.click();
-                    return;
+                    if (btn) {
+                        this.logger.log(`[archiver/hath] 点击提交按钮 (tagName=${btn.tagName})`);
+                        btn.click();
+                        return true;
+                    }
+                    this.logger.warn(`[archiver/hath] 找到分辨率 ${res} 但未找到提交按钮`);
+                    return false;
                 }
             }
-            return;
+            this.logger.warn(`[archiver/hath] select 中没有可用的目标分辨率`);
+            return false;
         }
 
         // Strategy 2: Find H@H downloader section by heading text, then locate resolution rows
@@ -418,8 +517,12 @@ export class Syringe {
             [...document.querySelectorAll('td, th')].find(
                 (el) => el.textContent?.trim() === 'H@H Downloader' || el.textContent?.trim() === 'H@H 下载器',
             );
+        this.logger.log(`[archiver/hath] H@H 容器标题: ${hathHeading ? hathHeading.tagName + '#' + hathHeading.id : '未找到'}`);
         const hathContainer = hathHeading?.closest('table, div');
-        if (!hathContainer) return;
+        if (!hathContainer) {
+            this.logger.warn('[archiver/hath] 未找到 H@H 容器 (策略2)');
+            return false;
+        }
 
         for (let i = startIndex; i < resolutionOrder.length; i++) {
             const res = resolutionValues[resolutionOrder[i]];
@@ -427,22 +530,31 @@ export class Syringe {
             const resCell = [...hathContainer.querySelectorAll('td, a')].find((el) =>
                 resTexts.includes(el.textContent?.trim() ?? ''),
             );
-            if (!resCell) continue;
+            if (!resCell) {
+                this.logger.log(`[archiver/hath] 未找到分辨率单元格: ${res} (${resTexts.join('/')})`);
+                continue;
+            }
             const row = resCell.closest('tr');
             if (row) {
                 const btn = row.querySelector<HTMLElement>(
                     'input[type="submit"], button[type="submit"], button[ehs-input], a[href]',
                 );
                 if (btn) {
+                    this.logger.log(`[archiver/hath] 找到分辨率 ${res} 的按钮，点击`);
                     btn.click();
-                    return;
+                    return true;
                 }
+                this.logger.warn(`[archiver/hath] 找到分辨率 ${res} 的行但未找到按钮`);
             } else if (resCell instanceof HTMLAnchorElement && resCell.href) {
                 // The resolution cell is itself a link – click it directly.
+                this.logger.log(`[archiver/hath] 分辨率 ${res} 的单元格是链接，直接点击`);
                 resCell.click();
-                return;
+                return true;
             }
         }
+
+        this.logger.warn('[archiver/hath] 未找到任何可用的分辨率按钮');
+        return false;
     }
 
     private updatingTagMap?: Promise<void>;
