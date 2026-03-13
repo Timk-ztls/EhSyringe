@@ -336,10 +336,13 @@ export class Syringe {
             // Detect H@H download success page: after the download request is queued the
             // archiver page stays open showing a confirmation message.  Auto-close the tab
             // so the user does not have to dismiss it manually.
+            // The syringe translates this message before this callback runs, so check
+            // for both the original English text and the Chinese translation.
             if (
                 document.body.textContent?.includes(
                     'Downloads should start processing within a couple of minutes.',
-                )
+                ) ||
+                document.body.textContent?.includes('下载会在几分钟内开始')
             ) {
                 window.close();
                 return;
@@ -399,13 +402,15 @@ export class Syringe {
         }
 
         // Strategy 2: Find H@H downloader section by heading text, then locate resolution rows
-        const resolutionTexts: Record<string, string> = {
-            org: 'Original',
-            '2400': '2400x',
-            '1600': '1600x',
-            '1280': '1280x',
-            '980': '980x',
-            '780': '780x',
+        // Each entry lists the accepted display texts for that resolution – both the English
+        // original and its Chinese translation (applied by the syringe before this code runs).
+        const resolutionTexts: Record<string, string[]> = {
+            org: ['Original', '原图'],
+            '2400': ['2400x'],
+            '1600': ['1600x'],
+            '1280': ['1280x'],
+            '980': ['980x'],
+            '780': ['780x'],
         };
         // Prefer a known H@H container id; fall back to table cells matching the section heading
         const hathHeading =
@@ -418,17 +423,23 @@ export class Syringe {
 
         for (let i = startIndex; i < resolutionOrder.length; i++) {
             const res = resolutionValues[resolutionOrder[i]];
-            const resText = resolutionTexts[res];
-            const resCell = [...hathContainer.querySelectorAll('td, a')].find(
-                (el) => el.textContent?.trim() === resText,
+            const resTexts = resolutionTexts[res];
+            const resCell = [...hathContainer.querySelectorAll('td, a')].find((el) =>
+                resTexts.includes(el.textContent?.trim() ?? ''),
             );
             if (!resCell) continue;
             const row = resCell.closest('tr');
-            const btn = row?.querySelector<HTMLElement>(
-                'input[type="submit"], button[type="submit"], button[ehs-input], a[href]',
-            );
-            if (btn) {
-                btn.click();
+            if (row) {
+                const btn = row.querySelector<HTMLElement>(
+                    'input[type="submit"], button[type="submit"], button[ehs-input], a[href]',
+                );
+                if (btn) {
+                    btn.click();
+                    return;
+                }
+            } else if (resCell instanceof HTMLAnchorElement && resCell.href) {
+                // The resolution cell is itself a link – click it directly.
+                resCell.click();
                 return;
             }
         }
