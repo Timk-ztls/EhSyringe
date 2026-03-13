@@ -323,6 +323,26 @@ export class Syringe {
 
         this.updateTagMap();
         this.messaging.on('tag-updated', () => this.updateTagMap());
+        this.autoClickArchiveButton();
+    }
+
+    private autoClickArchiveButton(): void {
+        if (!location.pathname.startsWith('/archiver.php')) return;
+
+        ready(() => {
+            const type = this.config.autoArchiveDownload;
+            if (type === 'disabled') return;
+
+            const targetValue =
+                type === 'original' ? 'Download Original Archive' : 'Download Resample Archive';
+
+            // The syringe replaces input[type="submit"] with button[ehs-input] during translation,
+            // keeping the original value attribute. Try both selectors.
+            const btn =
+                document.querySelector<HTMLInputElement>(`input[type="submit"][value="${targetValue}"]`) ??
+                document.querySelector<HTMLButtonElement>(`button[ehs-input][value="${targetValue}"]`);
+            btn?.click();
+        });
     }
 
     private updatingTagMap?: Promise<void>;
