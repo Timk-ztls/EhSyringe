@@ -333,16 +333,16 @@ export class Popup {
                                       原图
                                   </option>
                                   <option
-                                      value="2400x"
-                                      ?selected="${state.configValue.hathDownloadQuality === '2400x'}"
+                                      value="2560x"
+                                      ?selected="${state.configValue.hathDownloadQuality === '2560x'}"
                                   >
-                                      2400x（如不可用则降级）
+                                      2560x（如不可用则降级）
                                   </option>
                                   <option
-                                      value="1600x"
-                                      ?selected="${state.configValue.hathDownloadQuality === '1600x'}"
+                                      value="1920x"
+                                      ?selected="${state.configValue.hathDownloadQuality === '1920x'}"
                                   >
-                                      1600x（如不可用则降级）
+                                      1920x（如不可用则降级）
                                   </option>
                                   <option
                                       value="1280x"
@@ -351,16 +351,10 @@ export class Popup {
                                       1280x（如不可用则降级）
                                   </option>
                                   <option
-                                      value="980x"
-                                      ?selected="${state.configValue.hathDownloadQuality === '980x'}"
+                                      value="800x"
+                                      ?selected="${state.configValue.hathDownloadQuality === '800x'}"
                                   >
-                                      980x（如不可用则降级）
-                                  </option>
-                                  <option
-                                      value="780x"
-                                      ?selected="${state.configValue.hathDownloadQuality === '780x'}"
-                                  >
-                                      780x
+                                      800x
                                   </option>
                               </select>
                           </div>`
