@@ -58,6 +58,7 @@ E 站注射器，将中文翻译注入到 E 站体内。
 - 标签介绍
 - 标签翻译数据更新（当前[数据库](https://ehtt.vercel.app/list/all)包含 [![all](https://img.shields.io/endpoint?label=&color=brightgreen&url=https://ehtt.fly.dev/database/all/~badge)](https://ehtt.vercel.app/list/all) 条标签翻译）
 - 搜索框标签输入提示
+- 归档自动下载（支持原始档案、重采样档案、H@H 下载，可选画质）
 - 支持 Via、Alook 等支持自定义脚本的手机浏览器
 
 ## 特点
