@@ -349,8 +349,8 @@ export class Syringe {
                     bodyText.includes('Downloads should start processing within a couple of minutes.') ||
                     bodyText.includes('下载会在几分钟内开始')
                 ) {
-                    this.logger.log('[archiver] 检测到 H@H 排队成功页面，关闭标签页');
-                    closeCurrentTab();
+                    this.logger.log('[archiver] 检测到 H@H 排队成功页面，延迟后关闭标签页');
+                    setTimeout(() => closeCurrentTab(), 1500);
                     return;
                 }
 
@@ -425,9 +425,9 @@ export class Syringe {
                 bodyText.includes('Downloads should start processing within a couple of minutes.') ||
                 bodyText.includes('下载会在几分钟内开始')
             ) {
-                this.logger.log('[archiver] 动态检测到 H@H 排队成功页面，关闭标签页');
+                this.logger.log('[archiver] 动态检测到 H@H 排队成功页面，延迟后关闭标签页');
                 observer.disconnect();
-                closeCurrentTab();
+                setTimeout(() => closeCurrentTab(), 1500);
                 return;
             }
 
@@ -611,7 +611,8 @@ export class Syringe {
         if (downloadLink) {
             this.logger.log(`[archiver] 找到下载链接 "${downloadLink.textContent?.trim()}"，点击`);
             downloadLink.click();
-            closeCurrentTab();
+            this.logger.log('[archiver] 延迟后关闭标签页，等待下载开始');
+            setTimeout(() => closeCurrentTab(), 2000);
             return true;
         }
         return false;
