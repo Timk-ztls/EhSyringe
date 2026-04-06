@@ -1,6 +1,12 @@
 name: ci
 
 on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version tag (e.g. v3.4.6). Required to publish a release.'
+        required: false
+        type: string
   push:
     branches-ignore: [release]
     tags: ['*']
@@ -26,7 +32,7 @@ jobs:
       - name: Install
         uses: wyvox/action-setup-pnpm@v3
       - name: Download crx key
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         env:
           CRX_KEY: ${{ secrets.CRX_KEY }}
         run: |
@@ -38,7 +44,7 @@ jobs:
       - name: Build chrome
         run: pnpm run build:chrome
       - name: Pack chrome
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         run: pnpm run pack:chrome
       - name: Build firefox
         run: pnpm run build:firefox
@@ -47,7 +53,7 @@ jobs:
       - name: List releases
         run: ls -lh releases/
       - uses: actions/attest-build-provenance@v4
-        if: startsWith(github.event.ref, 'refs/tags/')
+        if: startsWith(github.event.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.version != '')
         with:
           subject-path: releases/
       - uses: actions/upload-artifact@v7
@@ -60,7 +66,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    if: startsWith(github.event.ref, 'refs/tags/')
+    if: startsWith(github.event.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.version != '')
 
     steps:
       - uses: actions/checkout@v6
@@ -74,6 +80,14 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: releases
+      - name: Get release tag
+        id: tag
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "value=${{ inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "value=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          fi
       - name: Generate checksum
         run: |
           sha256sum * > sha256sum.txt
@@ -85,13 +99,14 @@ jobs:
           artifacts: '*'
           replacesArtifacts: true
           generateReleaseNotes: true
+          tag: ${{ steps.tag.outputs.value }}
           body: |
             [更新日志](https://github.com/EhTagTranslation/EhSyringe/blob/master/CHANGELOG.md)
-          prerelease: ${{ contains(github.event.ref, '-') }}
+          prerelease: ${{ contains(steps.tag.outputs.value, '-') }}
       - name: Commit release mirror
         run: |
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git config user.name 'github-actions[bot]'
           git add .
-          git commit -am 'Release for [${{ github.event.ref }}](https://github.com/EhTagTranslation/EhSyringe/tree/${{ github.event.ref }})'
+          git commit -am 'Release for [${{ steps.tag.outputs.value }}](https://github.com/${{ github.repository }}/tree/${{ steps.tag.outputs.value }})'
           git push
