@@ -39,6 +39,11 @@ const skipNodeName = new Set<string>(['TITLE', 'LINK', 'META', 'HEAD', 'SCRIPT',
 const ignoreClassName = `eh-syringe-ignore`;
 const skipElementMatcher = `.${ignoreClassName}, .${ignoreClassName} *, [translate=no], [translate=no] :not([translate=yes])`;
 
+/** Delay (ms) before closing the tab after detecting the H@H queue success page. */
+const QUEUE_SUCCESS_TAB_CLOSE_DELAY_MS = 1500;
+/** Delay (ms) before closing the tab after clicking a download link on hath.network. */
+const DOWNLOAD_TAB_CLOSE_DELAY_MS = 2000;
+
 declare global {
     interface Window {
         toggle_advsearch_pane: (b: HTMLElement) => void;
@@ -350,7 +355,7 @@ export class Syringe {
                     bodyText.includes('下载会在几分钟内开始')
                 ) {
                     this.logger.log('[archiver] 检测到 H@H 排队成功页面，延迟后关闭标签页');
-                    setTimeout(() => closeCurrentTab(), 1500);
+                    setTimeout(() => closeCurrentTab(), QUEUE_SUCCESS_TAB_CLOSE_DELAY_MS);
                     return;
                 }
 
@@ -427,7 +432,7 @@ export class Syringe {
             ) {
                 this.logger.log('[archiver] 动态检测到 H@H 排队成功页面，延迟后关闭标签页');
                 observer.disconnect();
-                setTimeout(() => closeCurrentTab(), 1500);
+                setTimeout(() => closeCurrentTab(), QUEUE_SUCCESS_TAB_CLOSE_DELAY_MS);
                 return;
             }
 
@@ -612,7 +617,7 @@ export class Syringe {
             this.logger.log(`[archiver] 找到下载链接 "${downloadLink.textContent?.trim()}"，点击`);
             downloadLink.click();
             this.logger.log('[archiver] 延迟后关闭标签页，等待下载开始');
-            setTimeout(() => closeCurrentTab(), 2000);
+            setTimeout(() => closeCurrentTab(), DOWNLOAD_TAB_CLOSE_DELAY_MS);
             return true;
         }
         return false;
